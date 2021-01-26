@@ -40,11 +40,22 @@ https://github.com/micromark/micromark
 https://github.com/syntax-tree/mdast-util-from-markdown
 
 
+pub type MarkdownText = Vec<MarkdownInline>;
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum MarkdownInline {
+Link(String, String), --> PhrasingContent
+Image(String, String),  --> StaticPhrasingContent
+InlineCode(String), --> StaticPhrasingContent
+Bold(String), --> StaticPhrasingContent
+Italic(String), --> StaticPhrasingContent
+Plaintext(String), --> StaticPhrasingContent
+}
+
+
 ## Name
 
-Word play on Conrad Marcus the host of the Venom symbiote after Eddie Brock. Close to markup
-
-should we just use marcus? Or maybe Marcup
+Word play on Conrad Marcus the host of the Venom symbiote after Eddie Brock. Close to Markup
 
 ## Research 
 
@@ -59,6 +70,9 @@ related to content model
 - https://stackoverflow.com/questions/40776020/is-there-any-way-to-restrict-a-generic-type-to-one-of-several-types
 - https://stackoverflow.com/questions/52240099/should-i-use-enums-or-boxed-trait-objects-to-emulate-polymorphism
 
+# Features
+- Lossless representation - Unified/remark doesnt appear to be lossless. Example of this is with new lines.
+
 ### Nom 
 
 look at https://github.com/HGHimself/prose
@@ -66,4 +80,3 @@ look at https://github.com/HGHimself/prose
 https://github.com/Geal/nom/issues/14 - this issue includes nom implementations for a variety of formats 
 
 ### Pest
-

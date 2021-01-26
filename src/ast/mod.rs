@@ -1,9 +1,8 @@
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use nom::lib::std::fmt::Formatter;
 use serde_derive::{Deserialize, Serialize};
-use std::assert;
+use std::{assert, fmt};
 
-
-// TODO: anything from comrak that might be worth including? 
+// TODO: anything from comrak that might be worth including?
 // - NodeValue aka NodeType?
 // - DescriptionList
 // - DescriptionItem
@@ -22,6 +21,15 @@ use std::assert;
 
 trait NType {
     const TYPE: String;
+}
+
+
+// trait Parent {
+//     fn add_child(child: MdastContent);
+// }
+
+trait Parent<T> {
+    fn add_child(child: T);
 }
 
 // I dont like NoteType because its more then the type
@@ -67,12 +75,10 @@ pub enum NodeType {
     LinkReference(LinkReference),
 
     ImageReference(ImageReference),
-
     // TODO: add extensions
 }
 
 impl NodeType {
-
     // /// Indicates whether this node is a block node or inline node.
     // pub fn block(&self) -> bool {
     //     matches!(*self, NodeValue::Document
@@ -94,7 +100,6 @@ impl NodeType {
     //         | NodeValue::TableCell)
     // }
 
-
     // pub(crate) fn accepts_lines(&self) -> bool {
     //     matches!(
     //         *self,
@@ -104,56 +109,58 @@ impl NodeType {
 
     // TODO: is_parent
 
-    // TOOD: contains_inlines
-
+    // TODO: contains_inlines
 }
-
 
 // Data represents information associated by the ecosystem with the node.
 // TODO: should this just be a byte[]?
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Data<T> {
-
     value: T,
-
 }
 
 /// Represents one place in a source file.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Point {
     /// The line field (1-indexed integer) represents a line in a source file.
     line: u64,
 
-    /// The column field (1-indexed integer) represents a column in a source file. 
+    /// The column field (1-indexed integer) represents a column in a source file.
     column: u64,
 
     /// The offset field (0-indexed integer) represents a character in a source file.
-    offset: Option<u64>
+    offset: Option<u64>,
 }
 
 impl Point {
     pub fn new(line: u64, column: u64, offset: Option<u64>) -> Point {
         assert!(line >= 1);
         assert!(column >= 1);
-        
+
         Point {
-            line: line,
-            column: column,
-            offset: offset
+            line,
+            column,
+            offset,
         }
     }
 }
 
 /// Represents the location of a node in a source file.
-/// If the syntactic unit represented by a node is not present in the source file at the time of parsing, 
+/// If the syntactic unit represented by a node is not present in the source file at the time of parsing,
 /// the node is said to be generated and it must not have positional information.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Position {
     /// The start field represents the place of the first character of the parsed source region.
     start: Point,
 
-    /// The end field represents the place of the first character after the parsed source region, whether it exists or not. 
+    /// The end field represents the place of the first character after the parsed source region,
+    /// whether it exists or not.
     end: Point,
 
-    /// The indent field (1-indexed integer) represents the start column at each index (plus start line) in the source region, for elements that span multiple lines.
-    indent: Option<u32>
+    // TODO: remark/unify doesnt appear to include this in the json output
+    /// The indent field (1-indexed integer) represents the start column at each index
+    /// (plus start line) in the source region, for elements that span multiple lines.
+    indent: Option<u32>,
 }
 
 impl Position {
@@ -161,56 +168,65 @@ impl Position {
         if indent.is_some() {
             assert!(indent.unwrap() >= 1);
         }
-        
-        Position {
-            start: start,
-            end: end,
-            indent: indent
-        }
+
+        Position { start, end, indent }
     }
 }
 
-
+#[derive(Serialize, Deserialize)]
 pub struct Node {
-    pub node: NodeType,
+    // pub node: NodeType,
+    #[serde(rename = "type")]
+    pub node_type: String,
 
     // aka Data
     pub value: Option<Vec<u8>>,
 
-    pub position: Option<Position>
+    pub position: Option<Position>,
+}
+
+impl fmt::Debug for Node {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "type: [{}], value: [{:?}]",
+            self.node_type,
+            std::str::from_utf8(self.value.as_ref().unwrap())
+        )
+    }
 }
 
 // // TODO: not sure if this should be a struct or trait
 // // Syntactic units in unist syntax trees are called nodes, and implement the Node interface.
-// // Specifications implementing unist are encouraged to define more fields. 
+// // Specifications implementing unist are encouraged to define more fields.
 // // Ecosystems can define fields on Data.
-// // Any value in unist must be expressible in JSON values: string, number, object, array, true, false, or null. 
-// // This means that the syntax tree should be able to be converted to and from JSON and produce the same tree. 
+// // Any value in unist must be expressible in JSON values: string, number, object, array, true, false, or null.
+// // This means that the syntax tree should be able to be converted to and from JSON and produce the same tree.
 // // For example, in JavaScript, a tree can be passed through JSON.parse(JSON.stringify(tree)) and result in the same tree.
 // pub struct Node {
-//     // The type field is a non-empty string representing the variant of a node. 
+//     // The type field is a non-empty string representing the variant of a node.
 //     // This field can be used to determine the type a node implements.
 //     type: String,
 
-//     // The data field represents information from the ecosystem. 
+//     // The data field represents information from the ecosystem.
 //     // The value of the data field implements the Data interface.
 //     data: Option<Data>,
 
-//     // The position field represents the location of a node in a source document. 
-//     // The value of the position field implements the Position interface. 
+//     // The position field represents the location of a node in a source document.
+//     // The value of the position field implements the Position interface.
 //     // The position field must not be present if a node is generated.
 //     position: Option<Position>
 
 // }
 
 // TOOD: given Rust doesnt have strutural inheritance we cant extend other structs and this doesnt really feel like a trait
-// so Rust pushes you towards structural composition. As a result I think we just want to include a 
+// so Rust pushes you towards structural composition. As a result I think we just want to include a
 // children: Node[] field on structs that are parents and have a utility fn to determine if a node is a parent or not
 // TODO: implement Node
 // Nodes containing other nodes (said to be children) extend the abstract interface Parent (Node).
 // pub struct Parent {
 //     // The children field is a list representing the children of a node.
-//     // mdas specifies this as MdastContent
+//     // mdast specifies this as MdastContent
 //     children: Node[]
 // }
 
@@ -218,16 +234,17 @@ pub struct Node {
 // Do we get rid of this? Is it needed? We can probably just make data/value either a string/&str or byte[]/vec
 // TODO: implement Node
 // Nodes containing a value extend the abstract interface Literal (Node).
-// pub struct Literal<T> {
-//     // The value field can contain any value.
-//     // TODO: does that mean its generic? 
-//     // mdas specifies this as a String
-//     value: T
-// }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Literal {
+    // The value field can contain any value.
+    // TODO: does that mean its generic?
+    // mdast specifies this as a String
+    value: String,
+}
 
 // Root (Parent) represents a document.
 // implements Parent
-// Root can be used as the root of a tree, never as a child. 
+// Root can be used as the root of a tree, never as a child.
 // Its content model is not limited to flow content, but can contain any mdast content with the restriction that all content must be of the same category.
 pub struct Root {
     // type: "root"
@@ -236,41 +253,44 @@ pub struct Root {
 // implements Parent
 // Paragraph (Parent) represents a unit of discourse dealing with a particular point or idea.
 // Paragraph can be used where content is expected. Its content model is phrasing content.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Paragraph {
     // type: "paragraph"
     // children: [PhrasingContent]
-    children: Vec<Node>,
+    children: Vec<PhrasingContent>,
 }
 
 // implements Parent
 // Heading (Parent) represents a heading of a section.
 // Heading can be used where flow content is expected. Its content model is phrasing content.
 // A depth field must be present. A value of 1 is said to be the highest rank and 6 the lowest.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Heading {
     // type: "heading"
 
+    // TODO: should this be u8 or usize?
     /// The depth of the header; from 1 to 6 for ATX headings, 1 or 2 for setext headings.
-    depth: u8,
+    pub depth: usize,
 
     // children: [PhrasingContent],
-    children: Vec<Node>,
+    pub children: Vec<PhrasingContent>,
 
     /// Whether the heading is setext (if not, ATX).
     pub setext: bool,
 }
 
 impl Heading {
-    pub fn new(depth: u8, setext: bool) -> Heading {
+    pub fn new(depth: usize, setext: bool) -> Heading {
         if setext {
             assert!(depth == 1 || depth == 2);
         } else {
             assert!(depth >= 1 && depth <= 6);
         }
-        
+
         Heading {
-            depth: depth,
-            setext: setext,
-            children: Vec::new()
+            depth,
+            setext,
+            children: Vec::new(),
         }
     }
 }
@@ -278,6 +298,7 @@ impl Heading {
 // implements Node
 // ThematicBreak (Node) represents a thematic break, such as a scene change in a story, a transition to another topic, or a new document.
 // ThematicBreak can be used where flow content is expected. It has no content model.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ThematicBreak {
     // type: "thematicBreak"
 }
@@ -285,6 +306,7 @@ pub struct ThematicBreak {
 // implements Parent
 // Blockquote (Parent) represents a section quoted from somewhere else.
 // Blockquote can be used where flow content is expected. Its content model is also flow content.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct BlockQuote {
     // type: "blockquote"
 
@@ -295,11 +317,12 @@ pub struct BlockQuote {
 // implements Parent
 // List (Parent) represents a list of items.
 // List can be used where flow content is expected. Its content model is list content.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct List {
     // type: "list"
 
-    // An ordered field can be present. 
-    // It represents that the items have been intentionally ordered (when true), 
+    // An ordered field can be present.
+    // It represents that the items have been intentionally ordered (when true),
     // or that the order of items is not important (when false or not present).
     ordered: Option<bool>,
 
@@ -316,10 +339,10 @@ pub struct List {
     children: Vec<Node>,
 }
 
-
 // implements Parent
 // ListItem (Parent) represents an item in a List.
 // ListItem can be used where list content is expected. Its content model is flow content.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ListItem {
     // type: "listItem"
 
@@ -334,6 +357,7 @@ pub struct ListItem {
 // HTML (Literal) represents a fragment of raw HTML.
 // HTML can be used where flow or phrasing content is expected. Its content is represented by its value field.
 // HTML nodes do not have the restriction of being valid or complete HTML ([HTML]) constructs.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct HTML {
     // type: "html"
     value: Vec<u8>,
@@ -343,20 +367,20 @@ pub struct HTML {
 // Code (Literal) represents a block of preformatted text, such as ASCII art or computer code.
 // Code can be used where flow content is expected. Its content is represented by its value field.
 // This node relates to the phrasing content concept InlineCode.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Code {
     // type: "code"
 
     // A lang field can be present. It represents the language of computer code being marked up.
     // https://github.github.com/gfm/#info-string
-    lang: Option<String>,
+    pub lang: Option<String>,
 
-    // If the lang field is present, a meta field can be present. 
+    // If the lang field is present, a meta field can be present.
     // It represents custom information relating to the node.
-    meta: Option<String>,
+    pub meta: Option<String>,
 
-    value: Vec<u8>,
+    pub value: Vec<u8>,
 }
-
 
 // implements node
 // Definition (Node) represents a resource.
@@ -364,6 +388,7 @@ pub struct Code {
 // Definition includes the mixins Association and Resource.
 // Definition should be associated with LinkReferences and ImageReferences.
 // TODO: what the heck is a mixin and how to model that in rust?
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Definition {
     // type: "definition"
 }
@@ -371,31 +396,40 @@ pub struct Definition {
 // implements literal
 // Text (Literal) represents everything that is just text.
 // Text can be used where phrasing content is expected. Its content is represented by its value field.
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type")]
 pub struct Text {
     // type: "text"
-    
-    value: Vec<u8>,
+    // #[serde(rename = "type")]
+    // pub node_type: String,
+    pub value: Option<Vec<u8>>,
+    pub position: Option<Position>,
 }
 
+// italic
 // implements Parent
 // Emphasis (Parent) represents stress emphasis of its contents.
 // Emphasis can be used where phrasing content is expected. Its content model is transparent content.
+#[derive(Serialize, Deserialize, Debug)]
+// #[serde(tag = "type", rename_all(serialize = "lowercase"))]
 pub struct Emphasis {
     // type: "emphasis"
-    
-    // children: [TransparentContent]
-    children: Vec<Node>,
-}
 
+    // children: [TransparentContent]
+    pub children: Vec<Node>,
+}
 
 // implements Parent
 // Strong (Parent) represents strong importance, seriousness, or urgency for its contents.
 // Strong can be used where phrasing content is expected. Its content model is transparent content.
+#[derive(Serialize, Deserialize, Debug)]
+// #[serde(tag = "type", rename_all(serialize = "lowercase"))]
+// #[serde(rename_all(serialize = "..."))]
 pub struct Strong {
-    // type: "emphasis"
+    // type: "strong"
 
     // children: [TransparentContent]
-    children: Vec<Node>,
+    pub children: Vec<Node>,
 }
 
 // implements literal
@@ -403,15 +437,16 @@ pub struct Strong {
 // InlineCode can be used where phrasing content is expected. Its content is represented by its value field.
 // This node relates to the flow content concept Code.
 // https://github.github.com/gfm/#code-spans
+#[derive(Serialize, Deserialize, Debug)]
 pub struct InlineCode {
     // type: "inlineCode"
-
     value: Vec<u8>,
 }
 
 // implements Node
 // Break (Node) represents a line break, such as in poems or addresses.
 // Break can be used where phrasing content is expected. It has no content model
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Break {
     // type: "break"
 }
@@ -421,17 +456,19 @@ pub struct Break {
 // Link (Parent) represents a hyperlink.
 // Link can be used where phrasing content is expected. Its content model is static phrasing content.
 // Link includes the mixin Resource.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Link {
     // type: "link"
 
     // children: [StaticPhrasingContent]
-    children: Vec<Node>,
+    children: Vec<StaticPhrasingContent>,
 }
 
 // implements Node
 // Image (Node) represents an image.
 // Image can be used where phrasing content is expected. It has no content model, but is described by its alt field.
 // Image includes the mixins Resource and Alternative.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Image {
     // type: "image"
 }
@@ -441,11 +478,12 @@ pub struct Image {
 // LinkReference can be used where phrasing content is expected. Its content model is static phrasing content.
 // LinkReference includes the mixin Reference.
 // LinkReferences should be associated with a Definition.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct LinkReference {
     // type: "linkReference"
-    
+
     // children: [StaticPhrasingContent]
-    children: Vec<Node>,
+    children: Vec<StaticPhrasingContent>,
 }
 
 // implements Node
@@ -453,10 +491,10 @@ pub struct LinkReference {
 // ImageReference can be used where phrasing content is expected. It has no content model, but is described by its alt field
 // ImageReference includes the mixins Reference and Alternative.
 // ImageReference should be associated with a Definition.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct ImageReference {
     // type: "imageReference"
 }
-
 
 // ------ MIXINS ------
 
@@ -471,36 +509,39 @@ pub trait Resource {
 
 // Association represents an internal relation from one node to another.
 // To normalize a value, collapse markdown whitespace ([\t\n\r ]+) to a space, trim the optional initial and/or final space, and perform case-folding.
-// Whether the value of identifier (or normalized label if there is no identifier) is expected to be a unique identifier or not depends on the type of node including the Association. 
+// Whether the value of identifier (or normalized label if there is no identifier) is expected to be a unique identifier or not depends on the type of node including the Association.
 // An example of this is that they should be unique on Definition, whereas multiple LinkReferences can be non-unique to be associated with one definition.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Association {
-    // An identifier field must be present. It can match another node. 
+    // An identifier field must be present. It can match another node.
     // identifier is a source value: character escapes and character references are not parsed. Its value must be normalized.
     identifier: String,
 
-    // A label field can be present. 
+    // A label field can be present.
     // label is a string value: it works just like title on a link or a lang on code: character escapes and character references are parsed.
-    label: Option<String>
+    label: Option<String>,
 }
 
 // Reference represents a marker that is associated to another node.
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Reference {
-    // A referenceType field must be present. 
+    // A referenceType field must be present.
     // Its value must be a referenceType. It represents the explicitness of the reference.
-    referenceType: String,
+    reference_type: String,
 }
 
 // Alternative represents a node with a fallback
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Alternative {
-    // An alt field should be present. 
+    // An alt field should be present.
     // It represents equivalent content for environments that cannot represent the node as intended.
     alt: Option<String>,
 }
 
-
 // ------ ENUMERATION ------
 
 /// Represents the explicitness of a reference.
+#[derive(Serialize, Deserialize, Debug)]
 pub enum ReferenceType {
     /// shortcut: the reference is implicit, its identifier inferred from its content
     Shortcut,
@@ -509,9 +550,8 @@ pub enum ReferenceType {
     Collapsed,
 
     /// full: the reference is explicit, its identifier explicitly set
-    Full
+    Full,
 }
-
 
 // ------ CONTENT MODEL ------
 
@@ -522,16 +562,16 @@ pub enum ReferenceType {
 //     list_content: ListContent,
 //     phrasing_content: PhrasingContent
 // }
-
-enum MdasContent {
+#[derive(Serialize, Deserialize, Debug)]
+pub enum MdastContent {
     FlowContent(FlowContent),
     ListContent(ListContent),
     PhrasingContent(PhrasingContent),
 }
 
 // another possibility is to use trait
-// pub trait MdasContent {}
-// impl MdasContent for FlowContent {}
+// pub trait MdastContent {}
+// impl MdastContent for FlowContent {}
 
 // type FlowContent = Blockquote | Code | Heading | HTML | List | ThematicBreak | Content
 // Flow content represent the sections of document.
@@ -558,16 +598,16 @@ enum MdasContent {
 // pub struct Foo<T: FlowContent> {}
 
 // or maybe yet just use another enum?
-enum FlowContent {
+#[derive(Serialize, Deserialize, Debug)]
+pub enum FlowContent {
     BlockQuote(BlockQuote),
     Code(Code),
+    Content(Content),
     Heading(Heading),
     HTML(HTML),
     List(List),
     ThematicBreak(ThematicBreak),
-    Content(Content),
 }
-
 
 // type Content = Definition | Paragraph
 // Content represents runs of text that form definitions and paragraphs.
@@ -575,10 +615,10 @@ enum FlowContent {
 //     definition: Definition,
 //     paragraph: Paragraph,
 // }
-
-enum Content {
+#[derive(Serialize, Deserialize, Debug)]
+pub enum Content {
     Definition(Definition),
-    Paragraph(Paragraph)
+    Paragraph(Paragraph),
 }
 
 // type ListContent = ListItem
@@ -586,8 +626,8 @@ enum Content {
 // union ListContent {
 //     list_item: ListItem;
 // }
-
-enum ListContent {
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ListContent {
     ListItem(ListItem),
 }
 
@@ -598,11 +638,11 @@ enum ListContent {
 //     link_reference: LinkReference,
 //     static_phrasing_content: StaticPhrasingContent
 // }
-
-enum PhrasingContent {
-    Link(Link),
-    LinkReference(LinkReference),
-    StaticPhrasingContent(StaticPhrasingContent)
+#[derive(Serialize, Deserialize, Debug)]
+pub enum PhrasingContent {
+    // Link(Link),
+    // LinkReference(LinkReference),
+    StaticPhrasingContent(StaticPhrasingContent),
 }
 
 // type StaticPhrasingContent = Break | Emphasis | HTML | Image | ImageReference | InlineCode | Strong | Text
@@ -618,32 +658,63 @@ enum PhrasingContent {
 //     text: Text,
 // }
 
-enum StaticPhrasingContent {
+// TODO: alias for Vec<StaticPhrasingContent>
+#[derive(Serialize, Deserialize)]
+pub enum StaticPhrasingContent {
     Break(Break),
+    /// aka italic
     Emphasis(Emphasis),
     HTML(HTML),
     Image(Image),
     ImageReference(ImageReference),
     InlineCode(InlineCode),
+    /// aka bold
     Strong(Strong),
+    /// aka plaintext
     Text(Text),
 }
 
+// impl fmt::Display for StaticPhrasingContent {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+//         match self {
+//             StaticPhrasingContent::Emphasis(e) => {
+//                 write!(f, "{}", t.value)
+//             }
+//             StaticPhrasingContent::Text(t) => {
+//                 write!(f, "{}", t.value)
+//             }
+//             _ => write!(f, "")
+//         }
+//     }
+// }
+
+impl fmt::Debug for StaticPhrasingContent {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            StaticPhrasingContent::Emphasis(e) => {
+                write!(f, "{:?}", e.children)
+            }
+            StaticPhrasingContent::Text(t) => {
+                write!(f, "{:?}", t.value)
+            }
+            _ => write!(f, ""),
+        }
+    }
+}
 
 // TODO: not sure how to handle as enums cant be used as a bound generic, only traits can
 // we could go the trait route but that seems funky to me
 // From what I can see TranparentContent parents are currently PhrasingContent so perhaps we use that
 // and thats good enough
-// The transparent content model is derived from the content model of its parent. 
+// The transparent content model is derived from the content model of its parent.
 // Effectively, this is used to prohibit nested links (and link references).
 // struct TransparentContent {
 
 // }
 
-enum TransparentContent {
-    PhrasingContent(PhrasingContent)
+pub enum TransparentContent {
+    PhrasingContent(PhrasingContent),
 }
-
 
 // ------ EXTENSIONS ------
 
@@ -658,7 +729,6 @@ pub struct Table {
 
     // Represents how cells in columns are aligned.
     align: Option<Vec<AlignType>>,
-
     // children: [TableContent]
 }
 
@@ -668,7 +738,7 @@ pub struct Table {
 // If the node is a head, it represents the labels of the columns for its parent Table.
 pub struct TableRow {
     // type: "tableRow"
-    // children: [RowContent]
+// children: [RowContent]
 }
 
 // implements Parent
@@ -677,12 +747,12 @@ pub struct TableRow {
 
 pub struct TableCell {
     // type: "tableCell"
-    // children: [PhrasingContent]
+// children: [PhrasingContent]
 }
 
 // implements ListItem
 pub struct ListItemGfm {
-    // In GFM, a checked field can be present. 
+    // In GFM, a checked field can be present.
     // It represents whether the item is done (when true), not done (when false), or indeterminate or not applicable (when null or not present).
     checked: Option<bool>,
 }
@@ -693,7 +763,7 @@ pub struct ListItemGfm {
 // aka strikethrough
 pub struct Delete {
     // type: "delete"
-    // children: [TransparentContent]
+// children: [TransparentContent]
 }
 
 /// Represents how phrasing content is aligned ([CSSTEXT]).
@@ -729,7 +799,6 @@ enum TableContent {
     TableRow(TableRow),
 }
 
-
 // type RowContent = TableCell
 // Row content represent the cells in a row.
 // union RowContent {
@@ -760,9 +829,7 @@ enum StaticPhrasingContentGfm {
     StaticPhrasingContent(StaticPhrasingContent),
 }
 
-
 // ### Frontmatter ###
-
 
 // implements Literal
 // The following interfaces are found with YAML.
@@ -774,7 +841,6 @@ pub struct YAML {
     // TODO: I would like this to be a list of key/value pairs
     value: Vec<u8>,
 }
-
 
 // type FrontmatterContent = YAML
 // Frontmatter content represent out-of-band information about the document.
@@ -805,7 +871,7 @@ enum FlowContentFrontmatter {
 // FootnoteDefinition should be associated with FootnoteReferences.
 pub struct FootnoteDefinition {
     // type: "footnoteDefinition"
-    // children: [FlowContent]
+// children: [FlowContent]
 }
 
 // implements Parent
@@ -813,9 +879,8 @@ pub struct FootnoteDefinition {
 // Footnote can be used where phrasing content is expected. Its content model is also phrasing content.
 pub struct Footnote {
     // type: "footnote"
-    // children: [PhrasingContent]
+// children: [PhrasingContent]
 }
-
 
 // implement Node
 // FootnoteReference (Node) represents a marker through association.
@@ -825,8 +890,6 @@ pub struct Footnote {
 pub struct FootnoteReference {
     // type: "footnoteReference"
 }
-
-
 
 // type FlowContentFootnotes = FootnoteDefinition | FlowContent
 // union FlowContentFootnotes {
@@ -838,7 +901,6 @@ enum FlowContentFootnotes {
     FootnoteDefinition(FootnoteDefinition),
     FlowContent(FlowContent),
 }
-
 
 // type StaticPhrasingContentFootnotes = Footnote | FootnoteReference | StaticPhrasingContent
 // union StaticPhrasingContentFootnotes {
