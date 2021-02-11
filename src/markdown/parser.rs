@@ -14,8 +14,8 @@ use nom::{
     IResult,
     Finish, error::Error,
 };
-use nom::bytes::complete::take_while;
-use nom::character::complete::multispace0;
+use nom::bytes::complete::{take_while, take_until};
+use nom::character::complete::{multispace0, space1};
 
 fn parse_bold(i: &str) -> IResult<&str, &str> {
     delimited(tag("**"), is_not("**"), tag("**"))(i)
@@ -99,8 +99,19 @@ fn parse_header(i: &str) -> IResult<&str, (usize, Vec<Inline>)> {
     tuple((parse_header_tag, parse_markdown_text))(i)
 }
 
-fn parse_code_block(i: &str) -> IResult<&str, &str> {
-    delimited(tag("```"), is_not("```"), tag("```"))(i)
+// TODO: indented code block
+// TODO: commonmark also supports ~ as the fenced block
+fn parse_code_block(i: &str) -> IResult<&str, (&str, &str)> {
+    // TODO: need to parse lang and meta
+    // lang is the first word after the fence
+    // meta is any content after the lang which is followed by a space
+    // delimited(tag("```"), is_not("```"), tag("```"))(i)
+    delimited(tag("```"), parse_fenced_code_info, tag("```"))(i)
+}
+
+fn parse_fenced_code_info(i: &str) -> IResult<&str, (&str, &str)> {
+    // let info = take_until(multispace0);
+    tuple((take_until(space1), preceded(space1, take_until(multispace0))))(i)
 }
 
 fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
@@ -119,9 +130,9 @@ pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
         }),
         map(parse_code_block, |e| {
             Block::Code(Code {
-                lang: None,
-                meta: None,
-                value: vec![]
+                lang: Some(e.0.to_owned()),
+                meta: Some(e.1.to_owned()),
+                value: e.as_bytes().to_vec()
             })
         }),
         map(parse_paragraph, |e| {
@@ -226,30 +237,47 @@ mod tests {
         println!("serialized = {}", serialized);
     }
 
-    // #[test]
-    // fn paragraph() {
-    //     let string = "Hello world";
-    //
-    //     let md = parse_paragraph(string);
-    //
-    //     // let md = parse_markdown(string);
-    //     assert!(md.is_ok());
-    //     let content = md.ok().unwrap().1;
-    //
-    //     let serialized = serde_json::to_string(&content).unwrap();
-    //     println!("serialized = {}", serialized);
-    // }
-    //
-    // #[test]
-    // fn multiline_paragraph() {
-    //     let string = "Hello.\nWorld.";
-    //
-    //     let md = parse_markdown(string);
-    //     assert!(md.is_ok());
-    //     let content = md.ok().unwrap().1;
-    //
-    //     let serialized = serde_json::to_string(&content).unwrap();
-    //     println!("serialized = {}", serialized);
-    // }
+    #[test]
+    fn code_block() {
+        let string = "```shell\nls\n```";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+
+        let b = [115,104,101,108,108,10,108,115,10];
+        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
+    }
+
+    #[test]
+    fn paragraph() {
+        let string = "Hello world";
+
+        let md = parse_paragraph(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
+
+    #[test]
+    fn multiline_paragraph() {
+        let string = "Hello.\nWorld.";
+
+        let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
 
 }
