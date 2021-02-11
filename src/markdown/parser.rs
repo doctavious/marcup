@@ -15,7 +15,7 @@ use nom::{
     Finish, error::Error,
 };
 use nom::bytes::complete::{take_while, take_until};
-use nom::character::complete::{multispace0, space1};
+use nom::character::complete::{multispace0, space1, multispace1, newline, alphanumeric0, line_ending, not_line_ending};
 
 fn parse_bold(i: &str) -> IResult<&str, &str> {
     delimited(tag("**"), is_not("**"), tag("**"))(i)
@@ -101,18 +101,34 @@ fn parse_header(i: &str) -> IResult<&str, (usize, Vec<Inline>)> {
 
 // TODO: indented code block
 // TODO: commonmark also supports ~ as the fenced block
-fn parse_code_block(i: &str) -> IResult<&str, (&str, &str)> {
+fn parse_code_block(i: &str) -> IResult<&str, (Option<String>, Option<String>, Vec<u8>)> {
     // TODO: need to parse lang and meta
     // lang is the first word after the fence
     // meta is any content after the lang which is followed by a space
+    let (remaining, code_block) = delimited(tag("```"), is_not("```"), tag("```"))(i)?;
+    println!("remaining [{}], code_block [{}]", remaining, code_block);
+    //let (remaining, info) = take_until(newline)(code_block)?;
+    //let (remaining, info): (&str, &str) = terminated(alphanumeric0, newline)(code_block)?;
+    let (remaining, info): (&str, &str) = not_line_ending(code_block)?;
+
+    let content = code_block.as_bytes().to_vec();
+    if !info.is_empty() {
+        let mut split: Vec<&str> = info.splitn(2," ").collect();
+        let metadata = if split.len() > 1 { Some(split[1].to_string()) } else { None };
+        Ok((remaining, (Some(split[0].to_string()), metadata, content)))
+    } else {
+        Ok((remaining, (None, None, content)))
+    }
+
     // delimited(tag("```"), is_not("```"), tag("```"))(i)
-    delimited(tag("```"), parse_fenced_code_info, tag("```"))(i)
 }
 
-fn parse_fenced_code_info(i: &str) -> IResult<&str, (&str, &str)> {
-    // let info = take_until(multispace0);
-    tuple((take_until(space1), preceded(space1, take_until(multispace0))))(i)
-}
+// fn parse_fenced_code_info(i: &str) -> IResult<&str, (&str, &str, &str)> {
+//     // let info = take_until(multispace0);
+//     let info = tuple((take_until(space1), preceded(space1, take_until(multispace0))))(i);
+//     let content = take_until("```");
+//     (info, content)
+// }
 
 fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
     terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
@@ -130,9 +146,9 @@ pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
         }),
         map(parse_code_block, |e| {
             Block::Code(Code {
-                lang: Some(e.0.to_owned()),
-                meta: Some(e.1.to_owned()),
-                value: e.as_bytes().to_vec()
+                lang: e.0, //None, //Some(e.0.to_owned()),
+                meta: e.1, //None, //Some(e.1.to_owned()),
+                value: e.2 //e.as_bytes().to_vec()
             })
         }),
         map(parse_paragraph, |e| {
@@ -239,7 +255,84 @@ mod tests {
 
     #[test]
     fn code_block() {
-        let string = "```shell\nls\n```";
+        let string = "```\nls\n```";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+
+        let b = [10,108,115,10];
+        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
+    }
+
+    #[test]
+    fn code_block_empty() {
+        let string = "```\n```";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+
+        let b = [10,108,115,10];
+        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
+    }
+
+    // TODO: this is wrong. for some reason there is a paragraph in the output
+    // content in code block should be considered literal
+    // from spec: The contents of a code block are literal text, and do not get parsed as Markdown:
+    // TODO: The closing code fence must use the same character as the opening fence:
+//     ```
+//     aaa
+//     ~~~
+//     ```
+    // TODO: Closing fences may be indented by 0-3 spaces, and their indentation need not match that of the opening fence:
+    #[test]
+    fn code_block_empty_content() {
+        let string = "```\n\n```";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+
+        let b = [10,108,115,10];
+        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
+    }
+
+    #[test]
+    fn code_block_literal_content() {
+        let string = "```\n*hi*\n```";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+
+        let b = [10,108,115,10];
+        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
+    }
+
+    #[test]
+    fn code_block_with_info() {
+        let string = "```shell some metadata\nls\n```";
 
         let md = parse_markdown(string);
 

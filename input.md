@@ -10,6 +10,10 @@ Hello, this is a *italic* as well as a **bold** and what about an ***bold italic
 }
 ```
 
+```
+
+```
+
 > This is a blockquote on two
 lines.
 

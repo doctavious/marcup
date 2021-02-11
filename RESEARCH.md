@@ -10,3 +10,5 @@ Thin Traits - http://aturon.github.io/blog/2015/09/18/reuse/#ending-2:-the-enum-
 - https://github.com/johannhof/markdown.rs -> supports setext
 - https://github.com/euclio/aurelius
 - https://github.com/mdx-js/rust
+- https://www.christopherbiscardi.com/custom-error-types-with-nom-5-in-rust
+- https://www.christopherbiscardi.com/parsing-mdx-atx-headings-in-rust-with-nom-part-1
