@@ -105,7 +105,7 @@ impl fmt::Debug for Node {
 pub struct Paragraph {
     // type: "paragraph"
     // children: [PhrasingContent]
-    children: Vec<Inline>,
+    pub children: Vec<Inline>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

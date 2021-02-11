@@ -80,3 +80,17 @@ look at https://github.com/HGHimself/prose
 https://github.com/Geal/nom/issues/14 - this issue includes nom implementations for a variety of formats 
 
 ### Pest
+
+
+## Remark 
+
+```shell
+remark input.md --tree-out
+```
+
+## Run
+
+Test with print
+```shell
+ RUST_BACKTRACE=1 cargo test -- --nocapture
+```

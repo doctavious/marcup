@@ -1,6 +1,6 @@
 // use crate::nom::markdown::MarkdownInline;
 // use crate::nom::markdown::MarkdownText;
-use crate::ast::{Emphasis, Node, Text, Strong, Inline, Block, Code};
+use crate::ast::{Emphasis, Node, Text, Strong, Inline, Block, Code, Paragraph};
 
 use crate::ast::Heading;
 use nom::{
@@ -12,7 +12,10 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     AsBytes,
     IResult,
+    Finish, error::Error,
 };
+use nom::bytes::complete::take_while;
+use nom::character::complete::multispace0;
 
 fn parse_bold(i: &str) -> IResult<&str, &str> {
     delimited(tag("**"), is_not("**"), tag("**"))(i)
@@ -33,6 +36,18 @@ fn parse_plaintext(i: &str) -> IResult<&str, String> {
             not(alt((tag("*"), tag("`"), tag("["), tag("!["), tag("\n")))),
             take(1u8),
         )),
+        |vec| vec.join(""),
+    )(i)
+}
+
+#[inline(always)]
+fn is_plain_text(chr: char) -> bool {
+    chr != '*' && chr != '`' && chr != '[' && chr != '\n'
+}
+
+fn parse_text(i: &str) -> IResult<&str, String> {
+    map(
+        many1(take_while(is_plain_text)),
         |vec| vec.join(""),
     )(i)
 }
@@ -68,7 +83,7 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
 }
 
 fn parse_markdown_text(i: &str) -> IResult<&str, Vec<Inline>> {
-    terminated(many0(parse_markdown_inline), tag("\n"))(i)
+    terminated(many0(parse_markdown_inline), multispace0)(i)
 }
 
 // this guy matches the literal character #
@@ -88,6 +103,11 @@ fn parse_code_block(i: &str) -> IResult<&str, &str> {
     delimited(tag("```"), is_not("```"), tag("```"))(i)
 }
 
+fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
+    terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
+}
+
+
 pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
     many1(alt((
         map(parse_header, |e| {
@@ -104,13 +124,21 @@ pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
                 value: vec![]
             })
         }),
+        map(parse_paragraph, |e| {
+            Block::Paragraph(Paragraph {
+                children: e
+            })
+        })
     )))(i)
 }
+
+type Err = Error<String>;
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
+    use std::error::Error;
 
     #[test]
     fn emphasis() {
@@ -130,8 +158,8 @@ mod tests {
 
     #[test]
     fn strong() {
-        let string = "**alpha**";
-        assert_eq!(parse_bold(string), Ok(("", "alpha")));
+        let string = "**alpha** ";
+        assert_eq!(parse_bold(string), Ok((" ", "alpha")));
 
         let md = parse_markdown_inline(string);
 
@@ -150,7 +178,7 @@ mod tests {
 
     #[test]
     fn header() {
-        let string = "# Header\n";
+        let string = "# Header";
         // assert_eq!(
         //     parse_header(string),
         //     Ok(("",
@@ -165,6 +193,31 @@ mod tests {
         //     ))
         // );
 
+        // let md = parse_header(string);
+        // let z = match md.finish() {
+        //     Ok((_remaining, name)) => {
+        //         println!("remaining [{}] name[{:?}]", _remaining, name);
+        //     },
+        //     Err(_) => {
+        //         println!("an error occurred");
+        //     }
+        // };
+
+        let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+
+        let b = [72,101,97,100,101,114];
+        println!("this is the content...{}", std::str::from_utf8(&b).unwrap());
+    }
+
+    #[test]
+    fn header_italicized() {
+        let string = "# *Hello* World";
+
         let md = parse_markdown(string);
         assert!(md.is_ok());
         let content = md.ok().unwrap().1;
@@ -172,4 +225,31 @@ mod tests {
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
     }
+
+    // #[test]
+    // fn paragraph() {
+    //     let string = "Hello world";
+    //
+    //     let md = parse_paragraph(string);
+    //
+    //     // let md = parse_markdown(string);
+    //     assert!(md.is_ok());
+    //     let content = md.ok().unwrap().1;
+    //
+    //     let serialized = serde_json::to_string(&content).unwrap();
+    //     println!("serialized = {}", serialized);
+    // }
+    //
+    // #[test]
+    // fn multiline_paragraph() {
+    //     let string = "Hello.\nWorld.";
+    //
+    //     let md = parse_markdown(string);
+    //     assert!(md.is_ok());
+    //     let content = md.ok().unwrap().1;
+    //
+    //     let serialized = serde_json::to_string(&content).unwrap();
+    //     println!("serialized = {}", serialized);
+    // }
+
 }
