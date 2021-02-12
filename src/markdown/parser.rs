@@ -102,14 +102,8 @@ fn parse_header(i: &str) -> IResult<&str, (usize, Vec<Inline>)> {
 // TODO: indented code block
 // TODO: commonmark also supports ~ as the fenced block
 fn parse_code_block(i: &str) -> IResult<&str, (Option<String>, Option<String>, Vec<u8>)> {
-    // TODO: need to parse lang and meta
-    // lang is the first word after the fence
-    // meta is any content after the lang which is followed by a space
     let (remaining, code_block) = delimited(tag("```"), is_not("```"), tag("```"))(i)?;
-    println!("remaining [{}], code_block [{}]", remaining, code_block);
-    //let (remaining, info) = take_until(newline)(code_block)?;
-    //let (remaining, info): (&str, &str) = terminated(alphanumeric0, newline)(code_block)?;
-    let (remaining, info): (&str, &str) = not_line_ending(code_block)?;
+    let (_, info): (&str, &str) = not_line_ending(code_block)?;
 
     let content = code_block.as_bytes().to_vec();
     if !info.is_empty() {
@@ -130,8 +124,25 @@ fn parse_code_block(i: &str) -> IResult<&str, (Option<String>, Option<String>, V
 //     (info, content)
 // }
 
+// TODO: they can also be interrupted by lists without a second newline
 fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
-    terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
+    // terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
+    // terminated(many0(parse_markdown_inline), newline)(i)
+    let result: IResult<&str, Vec<Inline>> = terminated(many0(parse_markdown_inline), tag("\n\n"))(i);
+    match result {
+        Ok((input, para)) => Ok((input, para)),
+        Err(e) => {
+            if i == "" {
+                Err(e)
+            } else {
+                Ok(("", vec![Inline::Text(Text {
+                    node_type: "text".to_string(),
+                    value: Some(i.as_bytes().to_vec()),
+                    position: None,
+                })]))
+            }
+        }
+    }
 }
 
 
@@ -326,7 +337,7 @@ mod tests {
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
 
-        let b = [10,108,115,10];
+        let b = [10,42,104,105,42,10];
         println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
@@ -359,6 +370,9 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
+
+        let b = [72,101,108,108,111,32,119,111,114,108,100];
+        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
     #[test]
@@ -371,6 +385,24 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
+
+        let b = [72,101,108,108,111,46,10,87,111,114,108,100,46];
+        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
+    }
+
+    #[test]
+    fn paragraph_terminated_by_list() {
+        let string = "Hello.\n- list item";
+
+        let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+
+        // let b = [72,101,108,108,111,46,10,87,111,114,108,100,46];
+        // println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
 }
