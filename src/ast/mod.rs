@@ -85,7 +85,7 @@ pub struct Node {
     pub node_type: String,
 
     // aka Data
-    pub value: Option<Vec<u8>>,
+    pub value: Option<String>,
 
     pub position: Option<Position>,
 }
@@ -96,7 +96,7 @@ impl fmt::Debug for Node {
             f,
             "type: [{}], value: [{:?}]",
             self.node_type,
-            std::str::from_utf8(self.value.as_ref().unwrap())
+            self.value
         )
     }
 }
@@ -145,7 +145,7 @@ pub struct Text {
     // type: "text"
     // #[serde(rename = "type")]
     pub node_type: String,
-    pub value: Option<Vec<u8>>,
+    pub value: Option<String>,
     pub position: Option<Position>,
 }
 
@@ -182,7 +182,7 @@ pub struct Code {
     // It represents custom information relating to the node.
     pub meta: Option<String>,
 
-    pub value: Vec<u8>,
+    pub value: String,
 }
 
 // TODO: alias for Vec<StaticPhrasingContent>

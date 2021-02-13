@@ -15,7 +15,7 @@ use nom::{
     Finish, error::Error,
 };
 use nom::bytes::complete::{take_while, take_until};
-use nom::character::complete::{multispace0, space1, multispace1, newline, alphanumeric0, line_ending, not_line_ending};
+use nom::character::complete::{multispace0, space1, multispace1, newline, alphanumeric0, line_ending, not_line_ending, alphanumeric1, space0, tab, alpha1, digit1};
 
 fn parse_bold(i: &str) -> IResult<&str, &str> {
     delimited(tag("**"), is_not("**"), tag("**"))(i)
@@ -58,7 +58,7 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
             Inline::Emphasis(Emphasis {
                 children: vec![Node {
                     node_type: "text".to_string(),
-                    value: Some(s.as_bytes().to_vec()),
+                    value: Some(s.to_string()),
                     position: None,
                 }],
             })
@@ -67,7 +67,7 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
             Inline::Strong(Strong {
                 children: vec![Node {
                     node_type: "text".to_string(),
-                    value: Some(s.as_bytes().to_vec()),
+                    value: Some(s.to_string()),
                     position: None,
                 }],
             })
@@ -75,7 +75,7 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
         map(parse_plaintext, |s| {
             Inline::Text(Text {
                 node_type: "text".to_string(),
-                value: Some(s.as_bytes().to_vec()),
+                value: Some(s.to_string()),
                 position: None,
             })
         }),
@@ -99,13 +99,29 @@ fn parse_header(i: &str) -> IResult<&str, (usize, Vec<Inline>)> {
     tuple((parse_header_tag, parse_markdown_text))(i)
 }
 
+// An indented code block is composed of one or more indented chunks separated by blank lines.
+// An indented chunk is a sequence of non-blank lines, each indented four or more spaces.
+// The contents of the code block are the literal contents of the lines, including trailing
+// line endings, minus four spaces of indentation.
+// An indented code block has no info string.
+fn  parse_indented_code_block(i: &str) -> IResult<&str, String> {
+    map(
+        many1(delimited(
+            alt((tag("    "), tag("\t"))),
+            alt((alpha1, digit1, space1)),
+            line_ending
+            )),
+        |vec| vec.join("\n"),
+    )(i)
+}
+
 // TODO: indented code block
 // TODO: commonmark also supports ~ as the fenced block
-fn parse_code_block(i: &str) -> IResult<&str, (Option<String>, Option<String>, Vec<u8>)> {
+fn parse_fenced_code_block(i: &str) -> IResult<&str, (Option<String>, Option<String>, String)> {
     let (remaining, code_block) = delimited(tag("```"), is_not("```"), tag("```"))(i)?;
     let (_, info): (&str, &str) = not_line_ending(code_block)?;
 
-    let content = code_block.as_bytes().to_vec();
+    let content = code_block.to_string();
     if !info.is_empty() {
         let mut split: Vec<&str> = info.splitn(2," ").collect();
         let metadata = if split.len() > 1 { Some(split[1].to_string()) } else { None };
@@ -125,10 +141,14 @@ fn parse_code_block(i: &str) -> IResult<&str, (Option<String>, Option<String>, V
 // }
 
 // TODO: they can also be interrupted by lists without a second newline
+// not sure alt with tag("\n- ") is the appropriate way to handle
 fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
     // terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
     // terminated(many0(parse_markdown_inline), newline)(i)
-    let result: IResult<&str, Vec<Inline>> = terminated(many0(parse_markdown_inline), tag("\n\n"))(i);
+    let result: IResult<&str, Vec<Inline>> = terminated(
+        many0(parse_markdown_inline),
+        alt((tag("\n\n"), tag("\n- ")))
+    )(i);
     match result {
         Ok((input, para)) => Ok((input, para)),
         Err(e) => {
@@ -137,7 +157,7 @@ fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
             } else {
                 Ok(("", vec![Inline::Text(Text {
                     node_type: "text".to_string(),
-                    value: Some(i.as_bytes().to_vec()),
+                    value: Some(i.to_string()),
                     position: None,
                 })]))
             }
@@ -155,7 +175,14 @@ pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
                 setext: false,
             })
         }),
-        map(parse_code_block, |e| {
+        map(parse_indented_code_block, |e| {
+            Block::Code(Code {
+                lang: None,
+                meta: None,
+                value: e.to_string()
+            })
+        }),
+        map(parse_fenced_code_block, |e| {
             Block::Code(Code {
                 lang: e.0, //None, //Some(e.0.to_owned()),
                 meta: e.1, //None, //Some(e.1.to_owned()),
@@ -247,9 +274,6 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        let b = [72,101,97,100,101,114];
-        println!("this is the content...{}", std::str::from_utf8(&b).unwrap());
     }
 
     #[test]
@@ -265,7 +289,35 @@ mod tests {
     }
 
     #[test]
-    fn code_block() {
+    fn indented_code_block() {
+        let string = "    ls\n     foo\n";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
+
+    #[test]
+    fn indented_tab_code_block() {
+        let string = "\tls\n\tfoo\n";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
+
+    #[test]
+    fn fenced_code_block() {
         let string = "```\nls\n```";
 
         let md = parse_markdown(string);
@@ -276,13 +328,10 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        let b = [10,108,115,10];
-        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
     #[test]
-    fn code_block_empty() {
+    fn fenced_code_block_empty() {
         let string = "```\n```";
 
         let md = parse_markdown(string);
@@ -293,9 +342,6 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        let b = [10,108,115,10];
-        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
     // TODO: this is wrong. for some reason there is a paragraph in the output
@@ -308,7 +354,7 @@ mod tests {
 //     ```
     // TODO: Closing fences may be indented by 0-3 spaces, and their indentation need not match that of the opening fence:
     #[test]
-    fn code_block_empty_content() {
+    fn fenced_code_block_empty_content() {
         let string = "```\n\n```";
 
         let md = parse_markdown(string);
@@ -319,13 +365,10 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        let b = [10,108,115,10];
-        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
     #[test]
-    fn code_block_literal_content() {
+    fn fenced_code_block_literal_content() {
         let string = "```\n*hi*\n```";
 
         let md = parse_markdown(string);
@@ -336,13 +379,10 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        let b = [10,42,104,105,42,10];
-        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
     #[test]
-    fn code_block_with_info() {
+    fn fenced_code_block_with_info() {
         let string = "```shell some metadata\nls\n```";
 
         let md = parse_markdown(string);
@@ -353,9 +393,6 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        let b = [115,104,101,108,108,10,108,115,10];
-        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
     #[test]
@@ -370,9 +407,6 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        let b = [72,101,108,108,111,32,119,111,114,108,100];
-        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
     #[test]
@@ -385,9 +419,6 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        let b = [72,101,108,108,111,46,10,87,111,114,108,100,46];
-        println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
     #[test]
@@ -400,9 +431,6 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
-
-        // let b = [72,101,108,108,111,46,10,87,111,114,108,100,46];
-        // println!("this is the context value...{}", std::str::from_utf8(&b).unwrap());
     }
 
 }
