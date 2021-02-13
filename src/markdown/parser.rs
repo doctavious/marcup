@@ -108,7 +108,7 @@ fn  parse_indented_code_block(i: &str) -> IResult<&str, String> {
     map(
         many1(delimited(
             alt((tag("    "), tag("\t"))),
-            alt((alpha1, digit1, space1)),
+            not_line_ending,
             line_ending
             )),
         |vec| vec.join("\n"),
@@ -184,9 +184,9 @@ pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
         }),
         map(parse_fenced_code_block, |e| {
             Block::Code(Code {
-                lang: e.0, //None, //Some(e.0.to_owned()),
-                meta: e.1, //None, //Some(e.1.to_owned()),
-                value: e.2 //e.as_bytes().to_vec()
+                lang: e.0,
+                meta: e.1,
+                value: e.2
             })
         }),
         map(parse_paragraph, |e| {
@@ -290,11 +290,49 @@ mod tests {
 
     #[test]
     fn indented_code_block() {
-        let string = "    ls\n     foo\n";
+        let string = "    ls\n    foo\n";
 
         let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
 
-        // let md = parse_markdown(string);
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
+
+    #[test]
+    fn indented_code_block_with_indented_line() {
+        let string = "    ls\n        foo\n";
+
+        let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
+
+    // TODO: this is incorrect based on spec
+    // trailing and preceding blank lines should not be included
+    #[test]
+    fn indented_code_block_trailing_and_preceding_blank_lines() {
+        let string = "    \n    ls\n    \n";
+
+        let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
+
+    // TODO: this is incorrect based on spec
+    // interior blank lines, even when not fully indented, should be included
+    #[test]
+    fn indented_code_block_interior_blank_lines() {
+        let string = "    ls\n \n  \n    hi";
+
+        let md = parse_markdown(string);
         assert!(md.is_ok());
         let content = md.ok().unwrap().1;
 
