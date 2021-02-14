@@ -8,8 +8,8 @@ use std::{assert, fmt};
 // Maybe NodeData. NodeInfo
 // #[derive(Serialize, Deserialize)]
 // #[serde(tag = "type", rename_all = "camelCase")] // BlockQuote doesnt follow this as the type is "blockquote"
-pub enum NodeType {
-    // Root(Root),
+pub enum Nodes {
+    Root(Root),
 
     Paragraph(Paragraph),
 
@@ -78,6 +78,14 @@ impl Position {
     }
 }
 
+trait NodeType {
+    const TYPE: &'static str;
+
+    fn node_type() -> &'static str {
+        Self::TYPE
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Node {
     // pub node: NodeType,
@@ -101,7 +109,23 @@ impl fmt::Debug for Node {
     }
 }
 
+// Root (Parent) represents a document.
+// implements Parent
+// Root can be used as the root of a tree, never as a child.
+// Its content model is not limited to flow content, but can contain any mdast content with the restriction that all content must be of the same category.
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", rename = "root")]
+pub struct Root {
+    // type: "root"
+    pub children: Vec<Node>,
+}
+
+impl NodeType for Root {
+    const TYPE: &'static str = "root";
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", rename = "paragraph")]
 pub struct Paragraph {
     // type: "paragraph"
     // children: [PhrasingContent]
@@ -109,6 +133,7 @@ pub struct Paragraph {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", rename = "heading")]
 pub struct Heading {
     // type: "heading"
 
@@ -140,16 +165,22 @@ impl Heading {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(tag = "type")]
+#[serde(tag = "type", rename = "text")]
 pub struct Text {
     // type: "text"
     // #[serde(rename = "type")]
-    pub node_type: String,
+    // pub node_type: String,
     pub value: Option<String>,
     pub position: Option<Position>,
 }
 
+impl NodeType for Text {
+    const TYPE: &'static str = "text";
+}
+
+
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", rename = "emphasis")]
 pub struct Emphasis {
     // type: "emphasis"
 
@@ -158,6 +189,7 @@ pub struct Emphasis {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", rename = "strong")]
 pub struct Strong {
     // type: "strong"
 
@@ -187,6 +219,7 @@ pub struct Code {
 
 // TODO: alias for Vec<StaticPhrasingContent>
 #[derive(Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Inline {
     /// aka italic
     Emphasis(Emphasis),
@@ -211,6 +244,7 @@ impl fmt::Debug for Inline {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(untagged)]
 pub enum Block {
     Heading(Heading),
     Paragraph(Paragraph),

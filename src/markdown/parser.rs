@@ -12,7 +12,7 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     AsBytes,
     IResult,
-    Finish, error::Error,
+    Finish, error::Error
 };
 use nom::bytes::complete::{take_while, take_until};
 use nom::character::complete::{multispace0, space1, multispace1, newline, alphanumeric0, line_ending, not_line_ending, alphanumeric1, space0, tab, alpha1, digit1};
@@ -74,7 +74,7 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
         }),
         map(parse_plaintext, |s| {
             Inline::Text(Text {
-                node_type: "text".to_string(),
+                //node_type: "text".to_string(),
                 value: Some(s.to_string()),
                 position: None,
             })
@@ -97,6 +97,10 @@ fn parse_header_tag(i: &str) -> IResult<&str, usize> {
 // this combines a tuple of the header tag and the rest of the line
 fn parse_header(i: &str) -> IResult<&str, (usize, Vec<Inline>)> {
     tuple((parse_header_tag, parse_markdown_text))(i)
+}
+
+fn indent(i: &str) -> nom::IResult<&str, &str> {
+    alt((tag("    "), tag("\t")))(i)
 }
 
 // An indented code block is composed of one or more indented chunks separated by blank lines.
@@ -156,7 +160,7 @@ fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
                 Err(e)
             } else {
                 Ok(("", vec![Inline::Text(Text {
-                    node_type: "text".to_string(),
+                    // node_type: "text".to_string(),
                     value: Some(i.to_string()),
                     position: None,
                 })]))
