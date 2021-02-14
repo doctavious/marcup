@@ -110,7 +110,7 @@ impl fmt::Debug for Node {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", rename = "root")]
 pub struct Root {
-    pub children: Vec<Node>,
+    pub children: Vec<Block>,
     pub position: Option<Position>,
 }
 

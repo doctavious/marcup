@@ -1,6 +1,6 @@
 // use crate::nom::markdown::MarkdownInline;
 // use crate::nom::markdown::MarkdownText;
-use crate::ast::{Emphasis, Node, Text, Strong, Inline, Block, Code, Paragraph, BlockQuote};
+use crate::ast::{Emphasis, Node, Text, Strong, Inline, Block, Code, Paragraph, BlockQuote, Root};
 
 use crate::ast::Heading;
 use nom::{
@@ -176,7 +176,6 @@ fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
                 Err(e)
             } else {
                 Ok(("", vec![Inline::Text(Text {
-                    // node_type: "text".to_string(),
                     value: Some(i.to_string()),
                     position: None,
                 })]))
@@ -227,6 +226,14 @@ pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
     )))(i)
 }
 
+pub fn parse(i: &str) -> IResult<&str, Root> {
+    let ast = parse_markdown(i)?;
+    Ok((ast.0, Root {
+        children: ast.1,
+        position: None
+    }))
+}
+
 type Err = Error<String>;
 
 #[cfg(test)]
@@ -234,13 +241,14 @@ mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
     use std::error::Error;
+    use insta::assert_json_snapshot;
 
     #[test]
     fn emphasis() {
         let string = "*alpha*";
         assert_eq!(parse_italics(string), Ok(("", "alpha")));
 
-        let md = parse_markdown_inline(string);
+        let md = parse(string);
 
         let content = md.ok().unwrap().1;
 
@@ -248,6 +256,8 @@ mod tests {
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
+
+        assert_json_snapshot!(content);
 
     }
 
