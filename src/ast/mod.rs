@@ -2,16 +2,12 @@ use nom::lib::std::fmt::Formatter;
 use serde_derive::{Deserialize, Serialize};
 use std::{assert, fmt};
 
-
-// I dont like NoteType because its more then the type
-// I'm also not a fan of NodeValue
-// Maybe NodeData. NodeInfo
-// #[derive(Serialize, Deserialize)]
-// #[serde(tag = "type", rename_all = "camelCase")] // BlockQuote doesnt follow this as the type is "blockquote"
 pub enum Nodes {
     Root(Root),
 
     Paragraph(Paragraph),
+
+    BlockQuote(BlockQuote),
 
     Heading(Heading),
 
@@ -109,15 +105,13 @@ impl fmt::Debug for Node {
     }
 }
 
-// Root (Parent) represents a document.
-// implements Parent
-// Root can be used as the root of a tree, never as a child.
-// Its content model is not limited to flow content, but can contain any mdast content with the restriction that all content must be of the same category.
+/// Root represents a document.
+/// Top level type used as the root of the tree and can never be a child
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", rename = "root")]
 pub struct Root {
-    // type: "root"
     pub children: Vec<Node>,
+    pub position: Option<Position>,
 }
 
 impl NodeType for Root {
@@ -127,15 +121,14 @@ impl NodeType for Root {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", rename = "paragraph")]
 pub struct Paragraph {
-    // type: "paragraph"
     // children: [PhrasingContent]
     pub children: Vec<Inline>,
+    pub position: Option<Position>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", rename = "heading")]
 pub struct Heading {
-    // type: "heading"
 
     // TODO: should this be u8 or usize?
     /// The depth of the header; from 1 to 6 for ATX headings, 1 or 2 for setext headings.
@@ -146,6 +139,8 @@ pub struct Heading {
 
     /// Whether the heading is setext (if not, ATX).
     pub setext: bool,
+
+    pub position: Option<Position>,
 }
 
 impl Heading {
@@ -160,16 +155,22 @@ impl Heading {
             depth,
             setext,
             children: Vec::new(),
+            position: None,
         }
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", rename = "blockquote")]
+pub struct BlockQuote {
+    // children: [FlowContent]
+    pub children: Vec<Block>,
+    pub position: Option<Position>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", rename = "text")]
 pub struct Text {
-    // type: "text"
-    // #[serde(rename = "type")]
-    // pub node_type: String,
     pub value: Option<String>,
     pub position: Option<Position>,
 }
@@ -182,19 +183,17 @@ impl NodeType for Text {
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", rename = "emphasis")]
 pub struct Emphasis {
-    // type: "emphasis"
-
     // children: [TransparentContent]
     pub children: Vec<Node>,
+    pub position: Option<Position>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 #[serde(tag = "type", rename = "strong")]
 pub struct Strong {
-    // type: "strong"
-
     // children: [TransparentContent]
     pub children: Vec<Node>,
+    pub position: Option<Position>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -203,9 +202,8 @@ pub enum Content {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(tag = "type", rename = "code")]
 pub struct Code {
-    // type: "code"
-
     // A lang field can be present. It represents the language of computer code being marked up.
     // https://github.github.com/gfm/#info-string
     pub lang: Option<String>,
@@ -215,6 +213,8 @@ pub struct Code {
     pub meta: Option<String>,
 
     pub value: String,
+
+    pub position: Option<Position>,
 }
 
 // TODO: alias for Vec<StaticPhrasingContent>
@@ -243,10 +243,11 @@ impl fmt::Debug for Inline {
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 #[serde(untagged)]
 pub enum Block {
     Heading(Heading),
     Paragraph(Paragraph),
-    Code(Code)
+    Code(Code),
+    BlockQuote(BlockQuote),
 }

@@ -1,6 +1,6 @@
 // use crate::nom::markdown::MarkdownInline;
 // use crate::nom::markdown::MarkdownText;
-use crate::ast::{Emphasis, Node, Text, Strong, Inline, Block, Code, Paragraph};
+use crate::ast::{Emphasis, Node, Text, Strong, Inline, Block, Code, Paragraph, BlockQuote};
 
 use crate::ast::Heading;
 use nom::{
@@ -61,6 +61,7 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
                     value: Some(s.to_string()),
                     position: None,
                 }],
+                position: None,
             })
         }),
         map(parse_bold, |s: &str| {
@@ -70,6 +71,7 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
                     value: Some(s.to_string()),
                     position: None,
                 }],
+                position: None,
             })
         }),
         map(parse_plaintext, |s| {
@@ -144,6 +146,20 @@ fn parse_fenced_code_block(i: &str) -> IResult<&str, (Option<String>, Option<Str
 //     (info, content)
 // }
 
+// TODO: This is very wrong
+// TODO: this needs to handle hanging lines (with >) which are paragraph continuations
+fn parse_blockquote(i: &str) -> IResult<&str, Vec<Block>> {
+    preceded(tag(">"), parse_markdown)(i)
+    // map(
+    //     many1(delimited(
+    //         tag(">"),
+    //         not_line_ending,
+    //         line_ending
+    //     )),
+    //     parse_markdown_text,
+    // )(i)
+}
+
 // TODO: they can also be interrupted by lists without a second newline
 // not sure alt with tag("\n- ") is the appropriate way to handle
 fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
@@ -177,25 +193,35 @@ pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
                 depth: e.0,
                 children: e.1,
                 setext: false,
+                position: None,
             })
         }),
         map(parse_indented_code_block, |e| {
             Block::Code(Code {
                 lang: None,
                 meta: None,
-                value: e.to_string()
+                value: e.to_string(),
+                position: None
             })
         }),
         map(parse_fenced_code_block, |e| {
             Block::Code(Code {
                 lang: e.0,
                 meta: e.1,
-                value: e.2
+                value: e.2,
+                position: None,
             })
+        }),
+        map(parse_blockquote, |e| {
+           Block:: BlockQuote(BlockQuote {
+               children: e,
+               position: None
+           })
         }),
         map(parse_paragraph, |e| {
             Block::Paragraph(Paragraph {
-                children: e
+                children: e,
+                position: None,
             })
         })
     )))(i)
@@ -426,6 +452,34 @@ mod tests {
     #[test]
     fn fenced_code_block_with_info() {
         let string = "```shell some metadata\nls\n```";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
+
+    #[test]
+    fn blockquote() {
+        let string = ">this is a block quote.\n> and this too";
+
+        let md = parse_markdown(string);
+
+        // let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
+
+    #[test]
+    fn blockquote_with_hanging_line() {
+        let string = ">this is a block quote.\nand this too\n\nhi";
 
         let md = parse_markdown(string);
 
