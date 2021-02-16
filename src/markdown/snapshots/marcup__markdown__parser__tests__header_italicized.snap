@@ -1,0 +1,35 @@
+---
+source: src/markdown/parser.rs
+expression: content
+
+---
+{
+  "type": "root",
+  "children": [
+    {
+      "type": "heading",
+      "depth": 1,
+      "children": [
+        {
+          "type": "emphasis",
+          "children": [
+            {
+              "type": "text",
+              "value": "Hello",
+              "position": null
+            }
+          ],
+          "position": null
+        },
+        {
+          "type": "text",
+          "value": " World",
+          "position": null
+        }
+      ],
+      "setext": false,
+      "position": null
+    }
+  ],
+  "position": null
+}

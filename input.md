@@ -4,6 +4,10 @@ Hello, this is a *italic* as well as a **bold** and what about an ***bold italic
 
 ## Hello, *World*!
 
+```
+ls
+```
+
 ```json
 {
   "key": "value"
@@ -19,3 +23,7 @@ lines.
 
 multiline.
 paragraph.
+
+```
+
+```
