@@ -85,7 +85,6 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
         }),
         map(parse_plaintext, |s| {
             Inline::Text(Text {
-                //node_type: "text".to_string(),
                 value: Some(s.to_string()),
                 position: None,
             })
@@ -133,18 +132,19 @@ fn  parse_indented_code_block(i: &str) -> IResult<&str, String> {
 // TODO: indented code block
 // TODO: at least three consecutive backtick characters (`) or tildes (~). (Tildes and backticks cannot be mixed.)
 // TODO: The closing code fence must be at least as long as the opening fence
-// TODO: commonmark also supports ~ as the fenced block
 fn parse_fenced_code_block(i: &str) -> IResult<&str, (Option<String>, Option<String>, String)> {
-    let (remaining, block) = alt((delimited(
+    let (remaining, block) = alt((
+        delimited(
         tag("```"),
         is_not("```"),
         tag("```")
-            ),
-                                 delimited(
-                                     tag("~~~"),
-                                     is_not("~~~"),
-                                     tag("~~~")))
-    )(i)?;
+        ),
+        delimited(
+         tag("~~~"),
+         is_not("~~~"),
+         tag("~~~")
+        )
+    ))(i)?;
 
     let (code, info) = terminated(not_line_ending, line_ending)(block)?;
 
@@ -488,17 +488,17 @@ mod tests {
     //     assert_json_snapshot!(content);
     // }
 
-    // #[test]
-    // fn multiline_paragraph() {
-    //     let string = "Hello.\nWorld.";
-    //
-    //     let md = parse_markdown(string);
-    //     assert!(md.is_ok());
-    //     let content = md.ok().unwrap().1;
-    //
-    //     let serialized = serde_json::to_string(&content).unwrap();
-    //     println!("serialized = {}", serialized);
-    // }
+    #[test]
+    fn multiline_paragraph() {
+        let string = "Hello.\nWorld.";
+
+        let md = parse_markdown(string);
+        assert!(md.is_ok());
+        let content = md.ok().unwrap().1;
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+    }
 
     // #[test]
     // fn paragraph_terminated_by_list() {
