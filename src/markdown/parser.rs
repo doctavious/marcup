@@ -131,12 +131,19 @@ fn  parse_indented_code_block(i: &str) -> IResult<&str, String> {
 }
 
 // TODO: indented code block
+// TODO: at least three consecutive backtick characters (`) or tildes (~). (Tildes and backticks cannot be mixed.)
+// TODO: The closing code fence must be at least as long as the opening fence
 // TODO: commonmark also supports ~ as the fenced block
 fn parse_fenced_code_block(i: &str) -> IResult<&str, (Option<String>, Option<String>, String)> {
-    let (remaining, block) = delimited(
+    let (remaining, block) = alt((delimited(
         tag("```"),
         is_not("```"),
         tag("```")
+            ),
+                                 delimited(
+                                     tag("~~~"),
+                                     is_not("~~~"),
+                                     tag("~~~")))
     )(i)?;
 
     let (code, info) = terminated(not_line_ending, line_ending)(block)?;
@@ -150,28 +157,16 @@ fn parse_fenced_code_block(i: &str) -> IResult<&str, (Option<String>, Option<Str
     }
 
     // I dislike this but works for not.
-    // eat trailing new line in code
-    let (_, code) = terminated(not_line_ending, line_ending)(code)?;
+    // eat trailing new line in code if it exists
+    let code_block = if code.is_empty() {
+        String::from("")
+    } else {
+        let (_, code) = terminated(not_line_ending, line_ending)(code)?;
+        code.to_string()
+    };
 
-    Ok((remaining, (lang, metadata, code.to_string())))
-
-    // if info.is_empty() {
-    //     Ok((remaining, (None, None, content)))
-    // } else {
-    //     let mut split: Vec<&str> = info.splitn(2," ").collect();
-    //     let metadata = if split.len() > 1 { Some(split[1].to_string()) } else { None };
-    //     Ok((remaining, (Some(split[0].to_string()), metadata, content)))
-    // }
-
-    // delimited(tag("```"), is_not("```"), tag("```"))(i)
+    Ok((remaining, (lang, metadata, code_block)))
 }
-
-// fn parse_fenced_code_info(i: &str) -> IResult<&str, (&str, &str, &str)> {
-//     // let info = take_until(multispace0);
-//     let info = tuple((take_until(space1), preceded(space1, take_until(multispace0))))(i);
-//     let content = take_until("```");
-//     (info, content)
-// }
 
 // TODO: This is very wrong
 // TODO: this needs to handle hanging lines (with >) which are paragraph continuations
@@ -385,6 +380,16 @@ mod tests {
     #[test]
     fn fenced_code_block() {
         let string = "```\nls\n```";
+
+        let md = parse(string);
+
+        assert!(md.is_ok());
+        assert_json_snapshot!(md.ok().unwrap().1);
+    }
+
+    #[test]
+    fn fenced_code_block_tilde() {
+        let string = "~~~\nls\n~~~";
 
         let md = parse(string);
 
