@@ -16,6 +16,7 @@ use nom::{
 };
 use nom::bytes::complete::{take_while, take_until, take_till};
 use nom::character::complete::{multispace0, space1, multispace1, newline, alphanumeric0, line_ending, not_line_ending, alphanumeric1, space0, tab, alpha1, digit1};
+use nom::combinator::eof;
 
 fn parse_bold(i: &str) -> IResult<&str, &str> {
     delimited(tag("**"), is_not("**"), tag("**"))(i)
@@ -93,7 +94,7 @@ fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
 }
 
 fn parse_markdown_text(i: &str) -> IResult<&str, Vec<Inline>> {
-    terminated(many0(parse_markdown_inline), multispace0)(i)
+    terminated(many0(parse_markdown_inline), alt((line_ending, eof)))(i)
 }
 
 // this guy matches the literal character #
@@ -271,21 +272,21 @@ mod tests {
     use std::error::Error;
     use insta::assert_json_snapshot;
 
-    // #[test]
-    // fn emphasis() {
-    //     let string = "*alpha*";
-    //     let md = parse(string);
-    //
-    //     let content = md.ok().unwrap().1;
-    //
-    //     println!("{:?}", &content);
-    //
-    //     let serialized = serde_json::to_string(&content).unwrap();
-    //     println!("serialized = {}", serialized);
-    //
-    //     assert_json_snapshot!(content);
-    // }
-    //
+    #[test]
+    fn emphasis() {
+        let string = "*alpha*";
+        let md = parse(string);
+
+        let content = md.ok().unwrap().1;
+
+        println!("{:?}", &content);
+
+        let serialized = serde_json::to_string(&content).unwrap();
+        println!("serialized = {}", serialized);
+
+        assert_json_snapshot!(content);
+    }
+
     // #[test]
     // fn strong() {
     //     let string = "**alpha** ";
@@ -305,7 +306,7 @@ mod tests {
 
     #[test]
     fn header() {
-        let string = "# Header";
+        let string = "# Header World";
 
         let md = parse(string);
 

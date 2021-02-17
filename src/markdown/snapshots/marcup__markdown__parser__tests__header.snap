@@ -1,6 +1,6 @@
 ---
 source: src/markdown/parser.rs
-expression: content
+expression: md.ok().unwrap().1
 
 ---
 {
@@ -12,7 +12,7 @@ expression: content
       "children": [
         {
           "type": "text",
-          "value": "Header",
+          "value": "Header World",
           "position": null
         }
       ],
