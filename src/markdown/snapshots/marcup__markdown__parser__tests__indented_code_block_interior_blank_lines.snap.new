@@ -1,0 +1,40 @@
+---
+source: src/markdown/parser.rs
+expression: md.ok().unwrap().1
+
+---
+{
+  "type": "root",
+  "children": [
+    {
+      "type": "code",
+      "lang": null,
+      "meta": null,
+      "value": "ls",
+      "position": null
+    },
+    {
+      "type": "paragraph",
+      "children": [
+        {
+          "type": "text",
+          "value": " ",
+          "position": null
+        }
+      ],
+      "position": null
+    },
+    {
+      "type": "paragraph",
+      "children": [
+        {
+          "type": "text",
+          "value": "  ",
+          "position": null
+        }
+      ],
+      "position": null
+    }
+  ],
+  "position": null
+}

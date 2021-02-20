@@ -30,3 +30,13 @@ paragraph.
 
 ```
 ```
+
+***strong emph***  
+
+***strong** in emph*  
+
+***emph* in strong**  
+
+**in strong *emph***  
+
+*in emph **strong***

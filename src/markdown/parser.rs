@@ -3,6 +3,7 @@
 use crate::ast::{Emphasis, Node, Text, Strong, Inline, Block, Code, Paragraph, BlockQuote, Root};
 
 use crate::ast::Heading;
+
 use nom::{
     branch::alt,
     bytes::complete::{is_not, tag, take, take_while1},
@@ -12,11 +13,13 @@ use nom::{
     sequence::{delimited, pair, preceded, terminated, tuple},
     AsBytes,
     IResult,
-    Finish, error::Error
+    Finish, error::Error,
 };
 use nom::bytes::complete::{take_while, take_until, take_till};
 use nom::character::complete::{multispace0, space1, multispace1, newline, alphanumeric0, line_ending, not_line_ending, alphanumeric1, space0, tab, alpha1, digit1};
 use nom::combinator::eof;
+use nom::character::is_alphanumeric;
+use nom::multi::fold_many1;
 
 fn parse_bold(i: &str) -> IResult<&str, &str> {
     delimited(tag("**"), is_not("**"), tag("**"))(i)
@@ -31,8 +34,28 @@ fn parse_italics(i: &str) -> IResult<&str, &str> {
         }
         Err(e) => Err(e)
     }
-
 }
+
+fn italics(i: &str) -> IResult<&str, String> {
+    let (i, _) = tag("*")(i)?;
+    let (i, _) = not(tag(" "))(i)?;
+    map(
+        terminated(many0(is_not("*")), tag("*")),
+        |vec| vec.join(""),
+    )(i)
+}
+
+// fn parse_italics3(i: &str) -> IResult<&str, &str> {
+//     tuple!(tag!("*"), alphanumeric1!, alt!(space1!, alphanumeric1!), tag!("*"))
+// }
+
+named!(parse_emphasis<&str, &str>,
+    do_parse!(
+        tag!("*") >>
+        text: take_until!("*") >>
+        (text)
+      )
+);
 
 // we want to match many things that are not any of our special tags
 // but since we have no tools available to match and consume in the negative case (without regex)
@@ -40,61 +63,78 @@ fn parse_italics(i: &str) -> IResult<&str, &str> {
 // we repeat this until we run into one of our special characters
 // then we join our array of characters into a String
 fn parse_plaintext(i: &str) -> IResult<&str, String> {
-    map(
+    println!("inside parse_plaintext for [{}]", i);
+    if i == "" {
+        return Ok(("", String::from("")))
+    }
+
+    let r = map(
         many1(preceded(
             not(alt((tag("*"), tag("`"), tag("["), tag("!["), tag("\n")))),
             take(1u8),
         )),
         |vec| vec.join(""),
-    )(i)
-}
+    )(i);
+    if r.is_err() {
+        println!("error in parse_plaintext");
+    } else {
+        println!("parse_plaintext is fine");
+    }
 
-#[inline(always)]
-fn is_plain_text(chr: char) -> bool {
-    chr != '*' && chr != '`' && chr != '[' && chr != '\n'
-}
-
-fn parse_text(i: &str) -> IResult<&str, String> {
-    map(
-        many1(take_while(is_plain_text)),
-        |vec| vec.join(""),
-    )(i)
+    r
 }
 
 fn parse_markdown_inline(i: &str) -> IResult<&str, Inline> {
-    alt((
+    println!("parse_markdown_inline [{}]", i);
+    let r = alt((
         map(parse_italics, |s: &str| {
-            println!("wth...[{}]", s);
-            Inline::Emphasis(Emphasis {
-                children: vec![Node {
-                    node_type: "text".to_string(),
+            println!("returning parse_italics...[{}]", s);
+            return Inline::Emphasis(Emphasis {
+                children: vec![Inline::Text(Text {
                     value: Some(s.to_string()),
-                    position: None,
-                }],
+                    position: None
+                })],
                 position: None,
-            })
+            });
         }),
         map(parse_bold, |s: &str| {
-            Inline::Strong(Strong {
-                children: vec![Node {
-                    node_type: "text".to_string(),
+            println!("returning parse_bold...[{}]", s);
+            return Inline::Strong(Strong {
+                children: vec![Inline::Text(Text {
                     value: Some(s.to_string()),
-                    position: None,
-                }],
+                    position: None
+                })],
                 position: None,
-            })
+            });
         }),
         map(parse_plaintext, |s| {
-            Inline::Text(Text {
+            println!("returning from parse_plaintext...[{}]", s);
+            return Inline::Text(Text {
                 value: Some(s.to_string()),
                 position: None,
-            })
+            });
         }),
-    ))(i)
+    ))(i);
+    if r.is_ok() {
+        println!("returning parse_markdown_inline [{}]", i);
+    } else {
+        println!("returning error parse_markdown_inline [{}]", i);
+    }
+    r
 }
 
 fn parse_markdown_text(i: &str) -> IResult<&str, Vec<Inline>> {
-    terminated(many0(parse_markdown_inline), alt((line_ending, eof)))(i)
+    println!("parse_markdown_text [{}]", i);
+    if i == "" {
+        return Ok(("", vec![]))
+    }
+
+    let r = terminated(many0(parse_markdown_inline), alt((line_ending, eof)))(i);
+    if r.is_err() {
+        println!("error parsing parse_markdown_text [{}]", i);
+    }
+
+    r
 }
 
 // this guy matches the literal character #
@@ -107,6 +147,7 @@ fn parse_header_tag(i: &str) -> IResult<&str, usize> {
 
 // this combines a tuple of the header tag and the rest of the line
 fn parse_header(i: &str) -> IResult<&str, (usize, Vec<Inline>)> {
+    println!("parse_header with [{}]", i);
     tuple((parse_header_tag, parse_markdown_text))(i)
 }
 
@@ -166,6 +207,7 @@ fn parse_fenced_code_block(i: &str) -> IResult<&str, (Option<String>, Option<Str
         code.to_string()
     };
 
+    println!("parse_fenced_code_block remaining [{}]",remaining);
     Ok((remaining, (lang, metadata, code_block)))
 }
 
@@ -186,7 +228,12 @@ fn parse_blockquote(i: &str) -> IResult<&str, Vec<Block>> {
 // TODO: they can also be interrupted by lists without a second newline
 // not sure alt with tag("\n- ") is the appropriate way to handle
 fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
-    terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
+    println!("inside parse_paragraph for [{}]", i);
+    // terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
+    // terminated(many0(parse_markdown_inline), tag("\n\n"))(i);
+    let r = terminated(many0(parse_markdown_inline), alt((tag("\n"), tag("\n\n"), eof)))(i);
+    // terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
+    // terminated(many0(parse_markdown_inline), tag("\n\n"))(i)
     // let result = terminated(many0(parse_markdown_inline), multispace0)(i);
     // // let result = terminated(many0(parse_markdown_inline), newline)(i);
     // // let result = parse_markdown_text(i);
@@ -211,11 +258,19 @@ fn parse_paragraph(i: &str) -> IResult<&str, Vec<Inline>> {
     //         }
     //     }
     // }
+
+    if r.is_ok() {
+        println!("returning parse_paragraph");
+    } else {
+        println!("returning error parse_paragraph");
+    }
+    r
+
 }
 
-
 pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
-    many1(alt((
+    println!("parse_markdown [{}]", i);
+    let r = many1(alt((
         map(parse_header, |e| {
             Block::Heading(Heading {
                 depth: e.0,
@@ -252,11 +307,19 @@ pub fn parse_markdown(i: &str) -> IResult<&str, Vec<Block>> {
                 position: None,
             })
         })
-    )))(i)
+    )))(i);
+
+    if r.is_ok() {
+        println!("returning parse_markdown");
+    } else {
+        println!("returning error parse_markdown");
+    }
+    r
 }
 
 pub fn parse(i: &str) -> IResult<&str, Root> {
     let ast = parse_markdown(i)?;
+    println!("parse ast has remaining [{}]", &ast.0);
     Ok((ast.0, Root {
         children: ast.1,
         position: None
@@ -275,16 +338,17 @@ mod tests {
     #[test]
     fn emphasis() {
         let string = "*alpha*";
-        let md = parse(string);
+        let md = parse_paragraph(string);
 
-        let content = md.ok().unwrap().1;
+        let content = md.ok().unwrap();
 
-        println!("{:?}", &content);
+        println!("{:?}", &content.1);
+        println!("{:?}", &content.0);
 
         let serialized = serde_json::to_string(&content).unwrap();
         println!("serialized = {}", serialized);
 
-        assert_json_snapshot!(content);
+        // assert_json_snapshot!(content);
     }
 
     // #[test]
@@ -512,5 +576,21 @@ mod tests {
     //     let serialized = serde_json::to_string(&content).unwrap();
     //     println!("serialized = {}", serialized);
     // }
+
+    #[test]
+    fn t() {
+        let result = parse_emphasis("a *foo bar*").ok().unwrap();
+        println!("remainder [{}] and value [{}]", result.0, result.1);
+    }
+
+    #[test]
+    fn test_italics() {
+        let result = italics("*foo bar*");
+        assert_eq!(result, Ok(("", String::from("foo bar"))));
+
+        let result = italics("* foo bar*");
+        //assert_eq!(result, Err(nom::Err::Error(("* foo bar*", nom::error::ErrorKind::Tag))));
+
+    }
 
 }

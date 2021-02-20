@@ -3,7 +3,7 @@
 Extend Enum vs Thin Traits - http://smallcultfollowing.com/babysteps/blog/2015/10/08/virtual-structs-part-4-extended-enums-and-thin-traits/
 Thin Traits - http://aturon.github.io/blog/2015/09/18/reuse/#ending-2:-the-enum-based-approach
 
-# Nom 
+## Nom 
 
 - https://github.com/netvl/md.rs
 - https://github.com/HGHimself/prose
@@ -12,3 +12,8 @@ Thin Traits - http://aturon.github.io/blog/2015/09/18/reuse/#ending-2:-the-enum-
 - https://github.com/mdx-js/rust
 - https://www.christopherbiscardi.com/custom-error-types-with-nom-5-in-rust
 - https://www.christopherbiscardi.com/parsing-mdx-atx-headings-in-rust-with-nom-part-1
+
+## Playgrounds
+
+- https://mdxjs.com/playground
+- https://astexplorer.net/

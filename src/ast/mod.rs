@@ -184,7 +184,7 @@ impl NodeType for Text {
 #[serde(tag = "type", rename = "emphasis")]
 pub struct Emphasis {
     // children: [TransparentContent]
-    pub children: Vec<Node>,
+    pub children: Vec<Inline>,
     pub position: Option<Position>,
 }
 
@@ -192,7 +192,7 @@ pub struct Emphasis {
 #[serde(tag = "type", rename = "strong")]
 pub struct Strong {
     // children: [TransparentContent]
-    pub children: Vec<Node>,
+    pub children: Vec<Inline>,
     pub position: Option<Position>,
 }
 
