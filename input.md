@@ -31,6 +31,10 @@ paragraph.
 ```
 ```
 
+a * foo bar*
+
+a ** foo bar**
+
 ***strong emph***  
 
 ***strong** in emph*  
@@ -40,3 +44,5 @@ paragraph.
 **in strong *emph***  
 
 *in emph **strong***
+
+****what is this****

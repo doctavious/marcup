@@ -17,3 +17,16 @@ Thin Traits - http://aturon.github.io/blog/2015/09/18/reuse/#ending-2:-the-enum-
 
 - https://mdxjs.com/playground
 - https://astexplorer.net/
+
+## Markdown AST / Parsing 
+
+- look at https://github.com/HGHimself/prose
+- https://github.com/chipsenkbeil/vimwiki-rs
+    - includes implementation of locate/span similar to nom_locate
+
+
+
+
+https://github.com/xen0n/maidata-rs
+
+https://github.com/CSUwangj/pure-markdown/tree/master
