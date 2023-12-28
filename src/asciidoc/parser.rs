@@ -6,7 +6,7 @@ use nom::{
     bytes::complete::{is_not, tag, take, take_while1},
     character::is_digit,
     combinator::{map, not},
-    multi::{many1},
+    multi::many1,
     sequence::{delimited, pair, preceded, terminated},
     IResult,
 };
