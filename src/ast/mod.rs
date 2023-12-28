@@ -205,14 +205,14 @@ impl Text {
         // });
         //
         // Text(inner)
-        Text(*self.value)
+        Text::new(self.value.to_owned())
     }
 
     pub fn into_owned(self) -> Text {
         // let inner = Cow::from(self.value.into_owned());
         //
         // Text(inner)
-        Text(self.value.to_owned())
+        Text::new(self.value.to_owned())
     }
 }
 
